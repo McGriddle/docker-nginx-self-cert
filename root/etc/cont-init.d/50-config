@@ -1,0 +1,72 @@
+#!/usr/bin/with-contenv bash
+
+# Display variables for troubleshooting
+echo -e "Variables set:\\n\
+PUID=${PUID}\\n\
+PGID=${PGID}\\n\
+DH_SIZE=${DH_SIZE}\\n\
+TZ=${TZ}\\n"
+
+
+# make our folders and links
+mkdir -p \
+	/config/{log/letsencrypt,log/fail2ban,fail2ban,crontabs} \
+	/var/run/fail2ban
+
+# copy/update the fail2ban config defaults to/in /config
+cp -R /defaults/fail2ban/filter.d /config/fail2ban/
+cp -R /defaults/fail2ban/action.d /config/fail2ban/
+# if jail.local is missing in /config, copy default
+[[ ! -f /config/fail2ban/jail.local ]] && \
+	cp /defaults/jail.local /config/fail2ban/jail.local
+# Replace fail2ban config with user config
+[[ -d /etc/fail2ban/filter.d ]] && \
+	rm -rf /etc/fail2ban/filter.d
+[[ -d /etc/fail2ban/action.d ]] && \
+	rm -rf /etc/fail2ban/action.d
+cp -R /config/fail2ban/filter.d /etc/fail2ban/
+cp -R /config/fail2ban/action.d /etc/fail2ban/
+cp /defaults/fail2ban/fail2ban.local /etc/fail2ban/
+cp /config/fail2ban/jail.local /etc/fail2ban/jail.local
+
+# copy crontab and proxy defaults if needed
+[[ ! -f /config/crontabs/root ]] && \
+	cp /etc/crontabs/root /config/crontabs/
+[[ ! -f /config/nginx/proxy.conf ]] && \
+	cp /defaults/proxy.conf /config/nginx/proxy.conf
+[[ ! -f /config/nginx/ssl.conf ]] && \
+	cp /defaults/ssl.conf /config/nginx/ssl.conf
+
+
+# import user crontabs
+rm /etc/crontabs/*
+cp /config/crontabs/* /etc/crontabs/
+
+if [ ! -f "/config/nginx/keys/dhparams.pem" ]; then
+  echo "Creating DH parameters for additional security. This may take a very long time. There will be another message once this process is completed"
+  mkdir -p /config/nginx/keys
+  openssl dhparam -out /config/nginx/keys/dhparams.pem "$DH_SIZE"
+  echo "DH parameters successfully created - $DH_SIZE bits"
+fi
+
+if [ ! -e "/config/nginx/keys/cert.pem" ] || [ ! -e "/config/nginx/keys/key.pem" ]
+then
+  echo ">> generating self signed cert"
+  openssl req -x509 -newkey rsa:4086 \
+  -subj "/C=XX/ST=XXXX/L=XXXX/O=XXXX/CN=localhost" \
+  -keyout "/config/nginx/keys/privkey.pem" \
+  -out "/config/nginx/keys/fullchain.pem" \
+  -days 3650 -nodes -sha256
+fi
+
+# logfiles needed by fail2ban
+[[ ! -f /config/log/nginx/error.log ]] && \
+	touch /config/log/nginx/error.log
+[[ ! -f /config/log/nginx/access.log ]] && \
+	touch /config/log/nginx/access.log
+
+# permissions
+chown -R abc:abc \
+	/config
+chmod -R 0644 /etc/logrotate.d
+chmod -R +r /config/log
