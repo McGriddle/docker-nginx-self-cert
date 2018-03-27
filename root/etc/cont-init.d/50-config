@@ -10,7 +10,7 @@ TZ=${TZ}\\n"
 
 # make our folders and links
 mkdir -p \
-	/config/{log/letsencrypt,log/fail2ban,fail2ban,crontabs} \
+	/config/{log/cert,log/fail2ban,fail2ban,crontabs} \
 	/var/run/fail2ban
 
 # copy/update the fail2ban config defaults to/in /config
@@ -42,22 +42,8 @@ cp /config/fail2ban/jail.local /etc/fail2ban/jail.local
 rm /etc/crontabs/*
 cp /config/crontabs/* /etc/crontabs/
 
-if [ ! -f "/config/nginx/keys/dhparams.pem" ]; then
-  echo "Creating DH parameters for additional security. This may take a very long time. There will be another message once this process is completed"
-  mkdir -p /config/nginx/keys
-  openssl dhparam -out /config/nginx/keys/dhparams.pem "$DH_SIZE"
-  echo "DH parameters successfully created - $DH_SIZE bits"
-fi
-
-if [ ! -e "/config/nginx/keys/cert.pem" ] || [ ! -e "/config/nginx/keys/key.pem" ]
-then
-  echo ">> generating self signed cert"
-  openssl req -x509 -newkey rsa:4086 \
-  -subj "/C=XX/ST=XXXX/L=XXXX/O=XXXX/CN=localhost" \
-  -keyout "/config/nginx/keys/privkey.pem" \
-  -out "/config/nginx/keys/fullchain.pem" \
-  -days 3650 -nodes -sha256
-fi
+# create self signed cert
+/app/cert-create.sh
 
 # logfiles needed by fail2ban
 [[ ! -f /config/log/nginx/error.log ]] && \

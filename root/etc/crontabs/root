@@ -5,3 +5,5 @@
 0       2       *       *       *       run-parts /etc/periodic/daily
 0       3       *       *       6       run-parts /etc/periodic/weekly
 0       5       1       *       *       run-parts /etc/periodic/monthly
+# renew self-signed certs
+8       4       *       *       *       /app/cert-renew.sh >> /config/log/cert/cert.log 2>&1
